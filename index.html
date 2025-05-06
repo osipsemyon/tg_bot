@@ -37,7 +37,9 @@
             background-position: center;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             cursor: pointer;
-            transition: transform 0.3s ease;
+            transition: transform 0.3s ease, background-image 0.5s ease;
+            /* Рубашка карты по умолчанию */
+            background-image: url('https://www.deckofcardsapi.com/static/img/back.png');
         }
         .card.selected {
             transform: translateY(-10px);
@@ -97,6 +99,10 @@
         const tgApp = window.Telegram.WebApp;
         tgApp.expand();
         tgApp.ready();
+        
+        // Включаем кнопку "Готово" в верхней части приложения
+        tgApp.MainButton.setText('Готово');
+        tgApp.MainButton.hide();
 
         // Карты Таро (используем те же URL, что и в боте)
         const tarotCards = [
@@ -140,7 +146,9 @@
         shuffledCards.slice(0, 12).forEach(card => {
             const cardElement = document.createElement('div');
             cardElement.className = 'card';
-            cardElement.style.backgroundImage = `url(${card.image})`;
+            // Изначально показываем рубашку карты
+            // Реальное изображение карты сохраняем в data-атрибуте
+            cardElement.dataset.image = card.image;
             cardElement.dataset.id = card.id;
             cardElement.dataset.name = card.name;
             
@@ -148,39 +156,57 @@
                 if (cardElement.classList.contains('selected')) {
                     // Отменяем выбор карты
                     cardElement.classList.remove('selected');
-                    const index = selectedCards.findIndex(c => c.id === card.id);
+                    // Возвращаем рубашку карты
+                    cardElement.style.backgroundImage = `url('https://www.deckofcardsapi.com/static/img/back.png')`;
+                    const index = selectedCards.findIndex(c => c.id === parseInt(card.id));
                     if (index !== -1) {
                         selectedCards.splice(index, 1);
                     }
                 } else if (selectedCards.length < maxCards) {
-                    // Выбираем карту
+                    // Выбираем карту и показываем её лицевую сторону
                     cardElement.classList.add('selected');
+                    cardElement.style.backgroundImage = `url(${cardElement.dataset.image})`;
                     selectedCards.push({
-                        id: card.id,
+                        id: parseInt(card.id),
                         name: card.name
                     });
                 }
                 
-                // Обновляем счетчик и состояние кнопки
+                // Обновляем счетчик и состояние кнопок
                 countElement.textContent = selectedCards.length;
                 submitButton.disabled = selectedCards.length !== maxCards;
+                
+                // Показываем или скрываем кнопку "Готово" в верхней части приложения
+                if (selectedCards.length === maxCards) {
+                    tgApp.MainButton.show();
+                } else {
+                    tgApp.MainButton.hide();
+                }
             });
             
             cardsContainer.appendChild(cardElement);
         });
 
-        // Обработка отправки выбранных карт
-        submitButton.addEventListener('click', () => {
-            const selectedCardNames = selectedCards.map(card => card.name);
-            
-            // Отправляем данные обратно в бота
-            tgApp.sendData(JSON.stringify({
-                cards: selectedCardNames
-            }));
-            
-            // Закрываем приложение
-            tgApp.close();
-        });
+        // Функция для отправки данных в бота
+        function sendDataToBot() {
+            if (selectedCards.length === maxCards) {
+                const selectedCardNames = selectedCards.map(card => card.name);
+                
+                // Отправляем данные обратно в бота
+                tgApp.sendData(JSON.stringify({
+                    cards: selectedCardNames
+                }));
+                
+                // Закрываем приложение
+                tgApp.close();
+            }
+        }
+
+        // Обработка отправки выбранных карт через кнопку в приложении
+        submitButton.addEventListener('click', sendDataToBot);
+        
+        // Обработка отправки выбранных карт через кнопку "Готово" в верхней части приложения
+        tgApp.MainButton.onClick(sendDataToBot);
     </script>
 </body>
 </html>
