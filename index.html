@@ -83,32 +83,41 @@
             opacity: 0.5;
             cursor: not-allowed;
         }
-        #log {
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #f5f5f5;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-family: monospace;
-            font-size: 12px;
-            max-height: 200px;
-            overflow-y: auto;
-            display: block !important; /* Всегда отображать лог */
-        }
-        .log-title {
-            font-weight: bold;
-            margin-top: 20px;
-            margin-bottom: 5px;
-            color: red;
-        }
-        .result {
+        .interpretation {
             margin-top: 20px;
             padding: 15px;
-            background-color: #e8f5e9;
-            border: 1px solid #4caf50;
-            border-radius: 5px;
-            font-weight: bold;
+            background-color: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            border-radius: 8px;
             display: none;
+        }
+        .interpretation h2 {
+            margin-top: 0;
+            color: var(--tg-theme-text-color, #000);
+        }
+        .interpretation p {
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+        .card-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .loading {
+            text-align: center;
+            margin-top: 20px;
+            display: none;
+        }
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--tg-theme-button-color, #2481cc);
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
         .error {
             margin-top: 20px;
@@ -119,19 +128,61 @@
             font-weight: bold;
             display: none;
         }
-        .manual-close {
+        .theme-input {
             display: block;
             width: 100%;
             padding: 12px;
-            background-color: #f44336;
-            color: white;
-            border: none;
+            margin-top: 20px;
+            border: 1px solid var(--tg-theme-hint-color, #999);
             border-radius: 8px;
             font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            text-align: center;
+            color: var(--tg-theme-text-color, #000);
+            background-color: var(--tg-theme-bg-color, #fff);
+        }
+        .theme-input::placeholder {
+            color: var(--tg-theme-hint-color, #999);
+        }
+        .theme-label {
+            display: block;
             margin-top: 20px;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: var(--tg-theme-text-color, #000);
+        }
+        .selected-cards {
+            margin-top: 20px;
+            display: none;
+        }
+        .selected-cards h2 {
+            margin-top: 0;
+            color: var(--tg-theme-text-color, #000);
+        }
+        .selected-card {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .selected-card-image {
+            width: 60px;
+            height: 90px;
+            border-radius: 5px;
+            margin-right: 10px;
+            background-size: cover;
+            background-position: center;
+        }
+        .selected-card-name {
+            font-weight: bold;
+        }
+        #log {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 150px;
+            overflow-y: auto;
             display: none;
         }
     </style>
@@ -143,16 +194,27 @@
     
     <div class="card-container" id="cards"></div>
     
+    <div class="selected-cards" id="selected-cards">
+        <h2>Выбранные карты:</h2>
+        <div id="selected-cards-list"></div>
+    </div>
+    
+    <label for="theme-input" class="theme-label">Укажите тему или вопрос для расклада (необязательно):</label>
+    <input type="text" id="theme-input" class="theme-input" placeholder="Например: любовь, карьера, здоровье...">
+    
     <button class="button" id="submit-button" disabled>Получить толкование</button>
     
-    <!-- Результат отправки данных -->
-    <div class="result" id="result">Данные успешно отправлены!</div>
-    <div class="error" id="error">Ошибка при отправке данных</div>
-    <button class="manual-close" id="manual-close">Закрыть приложение</button>
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Генерация толкования...</p>
+    </div>
+    
+    <div class="interpretation" id="interpretation"></div>
+    
+    <div class="error" id="error"></div>
     
     <!-- Лог для отладки -->
-    <div class="log-title">Лог отладки (важно!):</div>
-    <div id="log">Инициализация...</div>
+    <div id="log"></div>
 
     <script>
         // Функция для логирования
@@ -166,44 +228,10 @@
         
         // Инициализация Telegram WebApp
         const tgApp = window.Telegram.WebApp;
-        log("Инициализация Telegram WebApp");
-        
-        // Проверяем, что tgApp существует
-        if (!tgApp) {
-            log("ОШИБКА: tgApp не определен");
-        } else {
-            log("tgApp определен успешно");
-            log(`Версия Telegram WebApp: ${tgApp.version || 'не определена'}`);
-            log(`Платформа: ${tgApp.platform || 'не определена'}`);
-        }
         
         tgApp.expand();
-        log("tgApp.expand() вызван");
-        
         tgApp.ready();
-        log("tgApp.ready() вызван");
         
-        // Получаем initData
-        const initData = tgApp.initData || '';
-        log(`initData: ${initData.substring(0, 50)}...`);
-        
-        // Парсим initData
-        const initDataParams = new URLSearchParams(initData);
-        const user = initDataParams.get('user') ? JSON.parse(decodeURIComponent(initDataParams.get('user'))) : null;
-        const chat = initDataParams.get('chat') ? JSON.parse(decodeURIComponent(initDataParams.get('chat'))) : null;
-        const queryId = initDataParams.get('query_id');
-        
-        log(`User: ${user ? JSON.stringify(user).substring(0, 50) : 'не определен'}...`);
-        log(`Chat: ${chat ? JSON.stringify(chat).substring(0, 50) : 'не определен'}...`);
-        log(`Query ID: ${queryId || 'не определен'}`);
-        
-        // Включаем кнопку "Готово" в верхней части приложения
-        tgApp.MainButton.setText('Готово');
-        log("tgApp.MainButton.setText('Готово') вызван");
-        
-        tgApp.MainButton.hide();
-        log("tgApp.MainButton.hide() вызван");
-
         // Карты Таро (используем те же URL, что и в боте)
         const tarotCards = [
             { id: 0, name: "Шут", image: "https://upload.wikimedia.org/wikipedia/commons/9/90/RWS_Tarot_00_Fool.jpg" },
@@ -229,25 +257,24 @@
             { id: 20, name: "Суд", image: "https://upload.wikimedia.org/wikipedia/commons/d/dd/RWS_Tarot_20_Judgement.jpg" },
             { id: 21, name: "Мир", image: "https://upload.wikimedia.org/wikipedia/commons/f/ff/RWS_Tarot_21_World.jpg" }
         ];
-        log("Карты Таро инициализированы");
 
         // Выбранные карты
         const selectedCards = [];
         const maxCards = 3;
-        log("Максимальное количество карт: " + maxCards);
 
         // Создание карт
         const cardsContainer = document.getElementById('cards');
         const countElement = document.getElementById('count');
         const submitButton = document.getElementById('submit-button');
-        const resultElement = document.getElementById('result');
+        const interpretationElement = document.getElementById('interpretation');
+        const loadingElement = document.getElementById('loading');
         const errorElement = document.getElementById('error');
-        const manualCloseButton = document.getElementById('manual-close');
-        log("Элементы DOM получены");
+        const themeInput = document.getElementById('theme-input');
+        const selectedCardsElement = document.getElementById('selected-cards');
+        const selectedCardsListElement = document.getElementById('selected-cards-list');
 
         // Перемешиваем карты
         const shuffledCards = [...tarotCards].sort(() => Math.random() - 0.5);
-        log("Карты перемешаны");
 
         // Отображаем первые 12 карт
         shuffledCards.slice(0, 12).forEach(card => {
@@ -269,169 +296,224 @@
                     if (index !== -1) {
                         selectedCards.splice(index, 1);
                     }
-                    log(`Отменен выбор карты: ${card.name}`);
                 } else if (selectedCards.length < maxCards) {
                     // Выбираем карту и показываем её лицевую сторону
                     cardElement.classList.add('selected');
                     cardElement.style.backgroundImage = `url(${cardElement.dataset.image})`;
                     selectedCards.push({
                         id: parseInt(card.id),
-                        name: card.name
+                        name: card.name,
+                        image: card.image
                     });
-                    log(`Выбрана карта: ${card.name}`);
                 }
                 
                 // Обновляем счетчик и состояние кнопок
                 countElement.textContent = selectedCards.length;
                 submitButton.disabled = selectedCards.length !== maxCards;
-                log(`Выбрано карт: ${selectedCards.length}/${maxCards}`);
                 
                 // Показываем или скрываем кнопку "Готово" в верхней части приложения
                 if (selectedCards.length === maxCards) {
+                    tgApp.MainButton.setText('Готово');
                     tgApp.MainButton.show();
-                    log("Кнопка MainButton показана");
                 } else {
                     tgApp.MainButton.hide();
-                    log("Кнопка MainButton скрыта");
                 }
             });
             
             cardsContainer.appendChild(cardElement);
         });
-        log("12 карт добавлены в контейнер");
 
-        // Функция для отправки данных в бота через API
-        async function sendDataToBotViaAPI() {
-            log("Вызвана функция sendDataToBotViaAPI()");
+        // Функция для генерации толкования с помощью OpenAI API
+        async function generateInterpretation() {
+            // Показываем индикатор загрузки
+            loadingElement.style.display = 'block';
             
-            if (selectedCards.length === maxCards) {
-                const selectedCardNames = selectedCards.map(card => card.name);
-                log(`Выбранные карты: ${selectedCardNames.join(', ')}`);
-                
-                // Создаем JSON для отправки
-                const jsonData = JSON.stringify({
-                    cards: selectedCardNames
+            // Скрываем предыдущие результаты
+            interpretationElement.style.display = 'none';
+            errorElement.style.display = 'none';
+            
+            // Получаем выбранные карты
+            const selectedCardNames = selectedCards.map(card => card.name);
+            
+            // Получаем тему расклада
+            const theme = themeInput.value.trim() || "общий вопрос о жизненной ситуации";
+            
+            try {
+                // Формируем запрос к OpenAI API
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer sk-YOUR_OPENAI_API_KEY' // Замените на ваш API ключ
+                    },
+                    body: JSON.stringify({
+                        model: 'gpt-3.5-turbo',
+                        messages: [
+                            {
+                                role: 'system',
+                                content: 'Ты - опытный таролог с глубоким пониманием символики карт Таро. Твоя задача - дать подробное и мистическое толкование расклада из трех карт. Объясни значение каждой карты в контексте заданного вопроса, а затем дай общее толкование расклада. Используй мистический, но понятный язык. Не упоминай, что ты AI. Пиши на русском языке.'
+                            },
+                            {
+                                role: 'user',
+                                content: `Дай толкование расклада из трех карт Таро для вопроса о "${theme}". Карты: ${selectedCardNames.join(', ')}. Объясни значение каждой карты и общее толкование расклада.`
+                            }
+                        ],
+                        temperature: 0.7,
+                        max_tokens: 1000
+                    })
                 });
-                log(`Подготовленные данные: ${jsonData}`);
                 
-                try {
-                    // Получаем chat_id из initData
-                    const chatId = chat ? chat.id : (user ? user.id : null);
-                    if (!chatId) {
-                        throw new Error("Не удалось получить chat_id");
-                    }
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error.message);
+                }
+                
+                // Получаем толкование
+                const interpretation = data.choices[0].message.content;
+                
+                // Отображаем выбранные карты
+                selectedCardsListElement.innerHTML = '';
+                selectedCards.forEach(card => {
+                    const cardElement = document.createElement('div');
+                    cardElement.className = 'selected-card';
                     
-                    log(`Chat ID: ${chatId}`);
+                    const cardImageElement = document.createElement('div');
+                    cardImageElement.className = 'selected-card-image';
+                    cardImageElement.style.backgroundImage = `url(${card.image})`;
                     
-                    // Отправляем данные через API
-                    const botToken = '7230803454:AAHFp5PQq8NkBQNhz3UEjAegEXdByPin-M0'; // Токен бота
-                    const apiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+                    const cardNameElement = document.createElement('div');
+                    cardNameElement.className = 'selected-card-name';
+                    cardNameElement.textContent = card.name;
                     
-                    log(`Отправляем запрос на ${apiUrl}`);
+                    cardElement.appendChild(cardImageElement);
+                    cardElement.appendChild(cardNameElement);
                     
-                    const response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            chat_id: chatId,
-                            text: `Выбранные карты: ${selectedCardNames.join(', ')}`,
-                            parse_mode: 'HTML'
-                        })
+                    selectedCardsListElement.appendChild(cardElement);
+                });
+                
+                // Отображаем толкование
+                interpretationElement.innerHTML = `
+                    <h2>Толкование расклада для вопроса: "${theme}"</h2>
+                    ${interpretation.replace(/\n/g, '<br>')}
+                `;
+                
+                // Показываем результаты
+                selectedCardsElement.style.display = 'block';
+                interpretationElement.style.display = 'block';
+                
+                // Скрываем карты и форму
+                cardsContainer.style.display = 'none';
+                themeInput.style.display = 'none';
+                document.querySelector('.theme-label').style.display = 'none';
+                submitButton.style.display = 'none';
+                document.querySelector('.selected-count').style.display = 'none';
+                document.querySelector('.instructions').style.display = 'none';
+                
+            } catch (error) {
+                // Отображаем ошибку
+                errorElement.textContent = `Ошибка при генерации толкования: ${error.message}`;
+                errorElement.style.display = 'block';
+                
+                // Если ошибка связана с API ключом, предлагаем альтернативное решение
+                if (error.message.includes('API key')) {
+                    // Генерируем простое толкование без использования API
+                    const cardMeanings = {
+                        "Шут": "Новые начинания, спонтанность, свобода от ограничений.",
+                        "Маг": "Сила воли, мастерство, концентрация, проявление.",
+                        "Верховная Жрица": "Интуиция, тайные знания, внутренняя мудрость.",
+                        "Императрица": "Изобилие, творчество, плодородие, материнство.",
+                        "Император": "Авторитет, структура, контроль, отцовство.",
+                        "Иерофант": "Традиции, духовное руководство, конформизм.",
+                        "Влюбленные": "Выбор, союз, любовь, гармония отношений.",
+                        "Колесница": "Контроль, сила воли, победа, решительность.",
+                        "Сила": "Внутренняя сила, мужество, убеждение, терпение.",
+                        "Отшельник": "Самоанализ, поиск истины, внутреннее руководство.",
+                        "Колесо Фортуны": "Судьба, удача, изменения, точки поворота.",
+                        "Справедливость": "Справедливость, истина, закон, равновесие.",
+                        "Повешенный": "Жертва, отпускание, новая перспектива.",
+                        "Смерть": "Окончание, трансформация, переход, обновление.",
+                        "Умеренность": "Баланс, умеренность, терпение, цель.",
+                        "Дьявол": "Теневая сторона, зависимость, материализм, сексуальность.",
+                        "Башня": "Внезапные изменения, прорыв, хаос, откровение.",
+                        "Звезда": "Надежда, вдохновение, щедрость, обновление.",
+                        "Луна": "Иллюзия, интуиция, подсознание, неопределенность.",
+                        "Солнце": "Радость, успех, празднование, жизненность.",
+                        "Суд": "Возрождение, внутренний призыв, прощение.",
+                        "Мир": "Завершение, интеграция, достижение, путешествие."
+                    };
+                    
+                    let interpretation = `<h2>Толкование расклада для вопроса: "${theme}"</h2>`;
+                    
+                    // Добавляем толкование для каждой карты
+                    selectedCards.forEach((card, index) => {
+                        interpretation += `<p><strong>${index + 1}. ${card.name}</strong><br>${cardMeanings[card.name]}</p>`;
                     });
                     
-                    log(`Получен ответ от API: ${response.status} ${response.statusText}`);
+                    // Добавляем общее толкование
+                    interpretation += `<p><strong>Общее толкование:</strong><br>`;
                     
-                    const result = await response.json();
-                    log(`Ответ API: ${JSON.stringify(result)}`);
-                    
-                    if (result.ok) {
-                        log("Данные успешно отправлены через API");
-                        
-                        // Показываем сообщение об успехе
-                        resultElement.textContent = `Данные успешно отправлены через API! Выбранные карты: ${selectedCardNames.join(', ')}`;
-                        resultElement.style.display = 'block';
-                        manualCloseButton.style.display = 'block';
-                        
-                        return true;
+                    if (theme.includes('любов')) {
+                        interpretation += `Этот расклад указывает на важные аспекты ваших отношений. Обратите внимание на эмоциональную связь и коммуникацию с партнером. Сейчас важно быть открытым и честным в отношениях.`;
+                    } else if (theme.includes('карьер') || theme.includes('работ')) {
+                        interpretation += `В профессиональной сфере вас ждут изменения. Будьте готовы адаптироваться к новым обстоятельствам и использовать свои сильные стороны. Возможно, вам стоит обратить внимание на новые возможности.`;
+                    } else if (theme.includes('здоров')) {
+                        interpretation += `В отношении здоровья расклад советует обратить внимание на баланс между физическим и эмоциональным состоянием. Важно найти время для отдыха и восстановления сил.`;
                     } else {
-                        throw new Error(`Ошибка API: ${result.description}`);
+                        interpretation += `Этот расклад отражает текущую ситуацию в вашей жизни. Обратите внимание на знаки и возможности, которые открываются перед вами. Доверяйте своей интуиции и будьте открыты к изменениям.`;
                     }
-                } catch (error) {
-                    log(`ОШИБКА при отправке данных через API: ${error.message}`);
-                    errorElement.textContent = `Ошибка при отправке данных через API: ${error.message}`;
-                    errorElement.style.display = 'block';
-                    manualCloseButton.style.display = 'block';
-                    return false;
+                    
+                    interpretation += `</p>`;
+                    
+                    // Отображаем выбранные карты
+                    selectedCardsListElement.innerHTML = '';
+                    selectedCards.forEach(card => {
+                        const cardElement = document.createElement('div');
+                        cardElement.className = 'selected-card';
+                        
+                        const cardImageElement = document.createElement('div');
+                        cardImageElement.className = 'selected-card-image';
+                        cardImageElement.style.backgroundImage = `url(${card.image})`;
+                        
+                        const cardNameElement = document.createElement('div');
+                        cardNameElement.className = 'selected-card-name';
+                        cardNameElement.textContent = card.name;
+                        
+                        cardElement.appendChild(cardImageElement);
+                        cardElement.appendChild(cardNameElement);
+                        
+                        selectedCardsListElement.appendChild(cardElement);
+                    });
+                    
+                    // Отображаем толкование
+                    interpretationElement.innerHTML = interpretation;
+                    
+                    // Показываем результаты
+                    selectedCardsElement.style.display = 'block';
+                    interpretationElement.style.display = 'block';
+                    
+                    // Скрываем карты и форму
+                    cardsContainer.style.display = 'none';
+                    themeInput.style.display = 'none';
+                    document.querySelector('.theme-label').style.display = 'none';
+                    submitButton.style.display = 'none';
+                    document.querySelector('.selected-count').style.display = 'none';
+                    document.querySelector('.instructions').style.display = 'none';
+                    
+                    // Скрываем ошибку
+                    errorElement.style.display = 'none';
                 }
-            } else {
-                log(`ОШИБКА: Выбрано недостаточно карт (${selectedCards.length}/${maxCards})`);
-                return false;
+            } finally {
+                // Скрываем индикатор загрузки
+                loadingElement.style.display = 'none';
             }
         }
 
-        // Функция для отправки данных в бота через sendData
-        async function sendDataToBot() {
-            log("Вызвана функция sendDataToBot()");
-            
-            if (selectedCards.length === maxCards) {
-                const selectedCardNames = selectedCards.map(card => card.name);
-                log(`Выбранные карты: ${selectedCardNames.join(', ')}`);
-                
-                // Создаем JSON для отправки
-                const jsonData = JSON.stringify({
-                    cards: selectedCardNames
-                });
-                log(`Подготовленные данные: ${jsonData}`);
-                
-                try {
-                    // Отправляем данные обратно в бота
-                    log("Попытка отправить данные через tgApp.sendData()");
-                    tgApp.sendData(jsonData);
-                    log("tgApp.sendData() выполнен успешно");
-                    
-                    // Показываем сообщение об успехе
-                    resultElement.textContent = `Данные успешно отправлены через sendData! Выбранные карты: ${selectedCardNames.join(', ')}`;
-                    resultElement.style.display = 'block';
-                    manualCloseButton.style.display = 'block';
-                    
-                    return true;
-                } catch (error) {
-                    log(`ОШИБКА при отправке данных через sendData: ${error.message}`);
-                    
-                    // Если не удалось отправить данные через sendData, пробуем через API
-                    log("Пробуем отправить данные через API");
-                    return await sendDataToBotViaAPI();
-                }
-            } else {
-                log(`ОШИБКА: Выбрано недостаточно карт (${selectedCards.length}/${maxCards})`);
-                return false;
-            }
-        }
-
-        // Обработка отправки выбранных карт через кнопку в приложении
-        submitButton.addEventListener('click', async () => {
-            log("Нажата кнопка 'Получить толкование'");
-            await sendDataToBot();
-        });
+        // Обработка отправки выбранных карт
+        submitButton.addEventListener('click', generateInterpretation);
         
         // Обработка отправки выбранных карт через кнопку "Готово" в верхней части приложения
-        tgApp.MainButton.onClick(async () => {
-            log("Нажата кнопка MainButton");
-            await sendDataToBot();
-        });
-        
-        // Обработка закрытия приложения вручную
-        manualCloseButton.addEventListener('click', () => {
-            log("Нажата кнопка 'Закрыть приложение'");
-            tgApp.close();
-        });
-        
-        // Добавляем обработчики событий для отладки
-        window.addEventListener('error', (event) => {
-            log(`ОШИБКА: ${event.message} в ${event.filename}:${event.lineno}`);
-        });
+        tgApp.MainButton.onClick(generateInterpretation);
     </script>
 </body>
 </html>
