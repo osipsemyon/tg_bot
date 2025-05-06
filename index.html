@@ -93,7 +93,6 @@
             font-size: 12px;
             max-height: 150px;
             overflow-y: auto;
-            display: none;
         }
     </style>
 </head>
@@ -113,7 +112,6 @@
         // Функция для логирования
         function log(message) {
             const logElement = document.getElementById('log');
-            logElement.style.display = 'block';
             const timestamp = new Date().toISOString().substr(11, 8);
             logElement.innerHTML += `<div>[${timestamp}] ${message}</div>`;
             logElement.scrollTop = logElement.scrollHeight;
@@ -129,6 +127,8 @@
             log("ОШИБКА: tgApp не определен");
         } else {
             log("tgApp определен успешно");
+            log(`Версия Telegram WebApp: ${tgApp.version || 'не определена'}`);
+            log(`Платформа: ${tgApp.platform || 'не определена'}`);
         }
         
         tgApp.expand();
@@ -136,6 +136,20 @@
         
         tgApp.ready();
         log("tgApp.ready() вызван");
+        
+        // Получаем initData
+        const initData = tgApp.initData || '';
+        log(`initData: ${initData.substring(0, 50)}...`);
+        
+        // Парсим initData
+        const initDataParams = new URLSearchParams(initData);
+        const user = initDataParams.get('user') ? JSON.parse(decodeURIComponent(initDataParams.get('user'))) : null;
+        const chat = initDataParams.get('chat') ? JSON.parse(decodeURIComponent(initDataParams.get('chat'))) : null;
+        const queryId = initDataParams.get('query_id');
+        
+        log(`User: ${user ? JSON.stringify(user).substring(0, 50) : 'не определен'}...`);
+        log(`Chat: ${chat ? JSON.stringify(chat).substring(0, 50) : 'не определен'}...`);
+        log(`Query ID: ${queryId || 'не определен'}`);
         
         // Включаем кнопку "Готово" в верхней части приложения
         tgApp.MainButton.setText('Готово');
@@ -237,7 +251,68 @@
         });
         log("12 карт добавлены в контейнер");
 
-        // Функция для отправки данных в бота
+        // Функция для отправки данных в бота через API
+        async function sendDataToBotViaAPI() {
+            log("Вызвана функция sendDataToBotViaAPI()");
+            
+            if (selectedCards.length === maxCards) {
+                const selectedCardNames = selectedCards.map(card => card.name);
+                log(`Выбранные карты: ${selectedCardNames.join(', ')}`);
+                
+                // Создаем JSON для отправки
+                const jsonData = JSON.stringify({
+                    cards: selectedCardNames
+                });
+                log(`Подготовленные данные: ${jsonData}`);
+                
+                try {
+                    // Получаем chat_id из initData
+                    const chatId = chat ? chat.id : (user ? user.id : null);
+                    if (!chatId) {
+                        throw new Error("Не удалось получить chat_id");
+                    }
+                    
+                    log(`Chat ID: ${chatId}`);
+                    
+                    // Отправляем данные через API
+                    const botToken = '7230803454:AAHFp5PQq8NkBQNhz3UEjAegEXdByPin-M0'; // Токен бота
+                    const apiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+                    
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            chat_id: chatId,
+                            text: `Выбранные карты: ${selectedCardNames.join(', ')}`,
+                            parse_mode: 'HTML'
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    log(`Ответ API: ${JSON.stringify(result)}`);
+                    
+                    if (result.ok) {
+                        log("Данные успешно отправлены через API");
+                        
+                        // Закрываем приложение
+                        log("Попытка закрыть приложение через tgApp.close()");
+                        tgApp.close();
+                        log("tgApp.close() выполнен успешно");
+                    } else {
+                        throw new Error(`Ошибка API: ${result.description}`);
+                    }
+                } catch (error) {
+                    log(`ОШИБКА при отправке данных: ${error.message}`);
+                    alert(`Ошибка при отправке данных: ${error.message}`);
+                }
+            } else {
+                log(`ОШИБКА: Выбрано недостаточно карт (${selectedCards.length}/${maxCards})`);
+            }
+        }
+
+        // Функция для отправки данных в бота через sendData
         function sendDataToBot() {
             log("Вызвана функция sendDataToBot()");
             
@@ -263,7 +338,10 @@
                     log("tgApp.close() выполнен успешно");
                 } catch (error) {
                     log(`ОШИБКА при отправке данных: ${error.message}`);
-                    alert(`Ошибка при отправке данных: ${error.message}`);
+                    
+                    // Если не удалось отправить данные через sendData, пробуем через API
+                    log("Пробуем отправить данные через API");
+                    sendDataToBotViaAPI();
                 }
             } else {
                 log(`ОШИБКА: Выбрано недостаточно карт (${selectedCards.length}/${maxCards})`);
@@ -286,20 +364,6 @@
         window.addEventListener('error', (event) => {
             log(`ОШИБКА: ${event.message} в ${event.filename}:${event.lineno}`);
         });
-        
-        // Проверяем версию Telegram WebApp
-        if (tgApp.version) {
-            log(`Версия Telegram WebApp: ${tgApp.version}`);
-        } else {
-            log("Версия Telegram WebApp не определена");
-        }
-        
-        // Проверяем платформу
-        if (tgApp.platform) {
-            log(`Платформа: ${tgApp.platform}`);
-        } else {
-            log("Платформа не определена");
-        }
     </script>
 </body>
 </html>
