@@ -83,6 +83,18 @@
             opacity: 0.5;
             cursor: not-allowed;
         }
+        #log {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -93,16 +105,44 @@
     <div class="card-container" id="cards"></div>
     
     <button class="button" id="submit-button" disabled>Получить толкование</button>
+    
+    <!-- Лог для отладки -->
+    <div id="log"></div>
 
     <script>
+        // Функция для логирования
+        function log(message) {
+            const logElement = document.getElementById('log');
+            logElement.style.display = 'block';
+            const timestamp = new Date().toISOString().substr(11, 8);
+            logElement.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
         // Инициализация Telegram WebApp
         const tgApp = window.Telegram.WebApp;
+        log("Инициализация Telegram WebApp");
+        
+        // Проверяем, что tgApp существует
+        if (!tgApp) {
+            log("ОШИБКА: tgApp не определен");
+        } else {
+            log("tgApp определен успешно");
+        }
+        
         tgApp.expand();
+        log("tgApp.expand() вызван");
+        
         tgApp.ready();
+        log("tgApp.ready() вызван");
         
         // Включаем кнопку "Готово" в верхней части приложения
         tgApp.MainButton.setText('Готово');
+        log("tgApp.MainButton.setText('Готово') вызван");
+        
         tgApp.MainButton.hide();
+        log("tgApp.MainButton.hide() вызван");
 
         // Карты Таро (используем те же URL, что и в боте)
         const tarotCards = [
@@ -129,18 +169,22 @@
             { id: 20, name: "Суд", image: "https://upload.wikimedia.org/wikipedia/commons/d/dd/RWS_Tarot_20_Judgement.jpg" },
             { id: 21, name: "Мир", image: "https://upload.wikimedia.org/wikipedia/commons/f/ff/RWS_Tarot_21_World.jpg" }
         ];
+        log("Карты Таро инициализированы");
 
         // Выбранные карты
         const selectedCards = [];
         const maxCards = 3;
+        log("Максимальное количество карт: " + maxCards);
 
         // Создание карт
         const cardsContainer = document.getElementById('cards');
         const countElement = document.getElementById('count');
         const submitButton = document.getElementById('submit-button');
+        log("Элементы DOM получены");
 
         // Перемешиваем карты
         const shuffledCards = [...tarotCards].sort(() => Math.random() - 0.5);
+        log("Карты перемешаны");
 
         // Отображаем первые 12 карт
         shuffledCards.slice(0, 12).forEach(card => {
@@ -162,6 +206,7 @@
                     if (index !== -1) {
                         selectedCards.splice(index, 1);
                     }
+                    log(`Отменен выбор карты: ${card.name}`);
                 } else if (selectedCards.length < maxCards) {
                     // Выбираем карту и показываем её лицевую сторону
                     cardElement.classList.add('selected');
@@ -170,43 +215,91 @@
                         id: parseInt(card.id),
                         name: card.name
                     });
+                    log(`Выбрана карта: ${card.name}`);
                 }
                 
                 // Обновляем счетчик и состояние кнопок
                 countElement.textContent = selectedCards.length;
                 submitButton.disabled = selectedCards.length !== maxCards;
+                log(`Выбрано карт: ${selectedCards.length}/${maxCards}`);
                 
                 // Показываем или скрываем кнопку "Готово" в верхней части приложения
                 if (selectedCards.length === maxCards) {
                     tgApp.MainButton.show();
+                    log("Кнопка MainButton показана");
                 } else {
                     tgApp.MainButton.hide();
+                    log("Кнопка MainButton скрыта");
                 }
             });
             
             cardsContainer.appendChild(cardElement);
         });
+        log("12 карт добавлены в контейнер");
 
         // Функция для отправки данных в бота
         function sendDataToBot() {
+            log("Вызвана функция sendDataToBot()");
+            
             if (selectedCards.length === maxCards) {
                 const selectedCardNames = selectedCards.map(card => card.name);
+                log(`Выбранные карты: ${selectedCardNames.join(', ')}`);
                 
-                // Отправляем данные обратно в бота
-                tgApp.sendData(JSON.stringify({
+                // Создаем JSON для отправки
+                const jsonData = JSON.stringify({
                     cards: selectedCardNames
-                }));
+                });
+                log(`Подготовленные данные: ${jsonData}`);
                 
-                // Закрываем приложение
-                tgApp.close();
+                try {
+                    // Отправляем данные обратно в бота
+                    log("Попытка отправить данные через tgApp.sendData()");
+                    tgApp.sendData(jsonData);
+                    log("tgApp.sendData() выполнен успешно");
+                    
+                    // Закрываем приложение
+                    log("Попытка закрыть приложение через tgApp.close()");
+                    tgApp.close();
+                    log("tgApp.close() выполнен успешно");
+                } catch (error) {
+                    log(`ОШИБКА при отправке данных: ${error.message}`);
+                    alert(`Ошибка при отправке данных: ${error.message}`);
+                }
+            } else {
+                log(`ОШИБКА: Выбрано недостаточно карт (${selectedCards.length}/${maxCards})`);
             }
         }
 
         // Обработка отправки выбранных карт через кнопку в приложении
-        submitButton.addEventListener('click', sendDataToBot);
+        submitButton.addEventListener('click', () => {
+            log("Нажата кнопка 'Получить толкование'");
+            sendDataToBot();
+        });
         
         // Обработка отправки выбранных карт через кнопку "Готово" в верхней части приложения
-        tgApp.MainButton.onClick(sendDataToBot);
+        tgApp.MainButton.onClick(() => {
+            log("Нажата кнопка MainButton");
+            sendDataToBot();
+        });
+        
+        // Добавляем обработчики событий для отладки
+        window.addEventListener('error', (event) => {
+            log(`ОШИБКА: ${event.message} в ${event.filename}:${event.lineno}`);
+        });
+        
+        // Проверяем версию Telegram WebApp
+        if (tgApp.version) {
+            log(`Версия Telegram WebApp: ${tgApp.version}`);
+        } else {
+            log("Версия Telegram WebApp не определена");
+        }
+        
+        // Проверяем платформу
+        if (tgApp.platform) {
+            log(`Платформа: ${tgApp.platform}`);
+        } else {
+            log("Платформа не определена");
+        }
     </script>
 </body>
 </html>
