@@ -91,8 +91,15 @@
             border-radius: 5px;
             font-family: monospace;
             font-size: 12px;
-            max-height: 150px;
+            max-height: 200px;
             overflow-y: auto;
+            display: block !important; /* Всегда отображать лог */
+        }
+        .log-title {
+            font-weight: bold;
+            margin-top: 20px;
+            margin-bottom: 5px;
+            color: red;
         }
     </style>
 </head>
@@ -106,7 +113,8 @@
     <button class="button" id="submit-button" disabled>Получить толкование</button>
     
     <!-- Лог для отладки -->
-    <div id="log"></div>
+    <div class="log-title">Лог отладки (важно!):</div>
+    <div id="log">Инициализация...</div>
 
     <script>
         // Функция для логирования
@@ -278,6 +286,8 @@
                     const botToken = '7230803454:AAHFp5PQq8NkBQNhz3UEjAegEXdByPin-M0'; // Токен бота
                     const apiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
                     
+                    log(`Отправляем запрос на ${apiUrl}`);
+                    
                     const response = await fetch(apiUrl, {
                         method: 'POST',
                         headers: {
@@ -289,6 +299,8 @@
                             parse_mode: 'HTML'
                         })
                     });
+                    
+                    log(`Получен ответ от API: ${response.status} ${response.statusText}`);
                     
                     const result = await response.json();
                     log(`Ответ API: ${JSON.stringify(result)}`);
@@ -304,8 +316,8 @@
                         throw new Error(`Ошибка API: ${result.description}`);
                     }
                 } catch (error) {
-                    log(`ОШИБКА при отправке данных: ${error.message}`);
-                    alert(`Ошибка при отправке данных: ${error.message}`);
+                    log(`ОШИБКА при отправке данных через API: ${error.message}`);
+                    alert(`Ошибка при отправке данных через API: ${error.message}`);
                 }
             } else {
                 log(`ОШИБКА: Выбрано недостаточно карт (${selectedCards.length}/${maxCards})`);
@@ -337,7 +349,7 @@
                     tgApp.close();
                     log("tgApp.close() выполнен успешно");
                 } catch (error) {
-                    log(`ОШИБКА при отправке данных: ${error.message}`);
+                    log(`ОШИБКА при отправке данных через sendData: ${error.message}`);
                     
                     // Если не удалось отправить данные через sendData, пробуем через API
                     log("Пробуем отправить данные через API");
