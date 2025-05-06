@@ -101,6 +101,39 @@
             margin-bottom: 5px;
             color: red;
         }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e8f5e9;
+            border: 1px solid #4caf50;
+            border-radius: 5px;
+            font-weight: bold;
+            display: none;
+        }
+        .error {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #ffebee;
+            border: 1px solid #f44336;
+            border-radius: 5px;
+            font-weight: bold;
+            display: none;
+        }
+        .manual-close {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background-color: #f44336;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            margin-top: 20px;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -111,6 +144,11 @@
     <div class="card-container" id="cards"></div>
     
     <button class="button" id="submit-button" disabled>Получить толкование</button>
+    
+    <!-- Результат отправки данных -->
+    <div class="result" id="result">Данные успешно отправлены!</div>
+    <div class="error" id="error">Ошибка при отправке данных</div>
+    <button class="manual-close" id="manual-close">Закрыть приложение</button>
     
     <!-- Лог для отладки -->
     <div class="log-title">Лог отладки (важно!):</div>
@@ -202,6 +240,9 @@
         const cardsContainer = document.getElementById('cards');
         const countElement = document.getElementById('count');
         const submitButton = document.getElementById('submit-button');
+        const resultElement = document.getElementById('result');
+        const errorElement = document.getElementById('error');
+        const manualCloseButton = document.getElementById('manual-close');
         log("Элементы DOM получены");
 
         // Перемешиваем карты
@@ -308,24 +349,30 @@
                     if (result.ok) {
                         log("Данные успешно отправлены через API");
                         
-                        // Закрываем приложение
-                        log("Попытка закрыть приложение через tgApp.close()");
-                        tgApp.close();
-                        log("tgApp.close() выполнен успешно");
+                        // Показываем сообщение об успехе
+                        resultElement.textContent = `Данные успешно отправлены через API! Выбранные карты: ${selectedCardNames.join(', ')}`;
+                        resultElement.style.display = 'block';
+                        manualCloseButton.style.display = 'block';
+                        
+                        return true;
                     } else {
                         throw new Error(`Ошибка API: ${result.description}`);
                     }
                 } catch (error) {
                     log(`ОШИБКА при отправке данных через API: ${error.message}`);
-                    alert(`Ошибка при отправке данных через API: ${error.message}`);
+                    errorElement.textContent = `Ошибка при отправке данных через API: ${error.message}`;
+                    errorElement.style.display = 'block';
+                    manualCloseButton.style.display = 'block';
+                    return false;
                 }
             } else {
                 log(`ОШИБКА: Выбрано недостаточно карт (${selectedCards.length}/${maxCards})`);
+                return false;
             }
         }
 
         // Функция для отправки данных в бота через sendData
-        function sendDataToBot() {
+        async function sendDataToBot() {
             log("Вызвана функция sendDataToBot()");
             
             if (selectedCards.length === maxCards) {
@@ -344,32 +391,41 @@
                     tgApp.sendData(jsonData);
                     log("tgApp.sendData() выполнен успешно");
                     
-                    // Закрываем приложение
-                    log("Попытка закрыть приложение через tgApp.close()");
-                    tgApp.close();
-                    log("tgApp.close() выполнен успешно");
+                    // Показываем сообщение об успехе
+                    resultElement.textContent = `Данные успешно отправлены через sendData! Выбранные карты: ${selectedCardNames.join(', ')}`;
+                    resultElement.style.display = 'block';
+                    manualCloseButton.style.display = 'block';
+                    
+                    return true;
                 } catch (error) {
                     log(`ОШИБКА при отправке данных через sendData: ${error.message}`);
                     
                     // Если не удалось отправить данные через sendData, пробуем через API
                     log("Пробуем отправить данные через API");
-                    sendDataToBotViaAPI();
+                    return await sendDataToBotViaAPI();
                 }
             } else {
                 log(`ОШИБКА: Выбрано недостаточно карт (${selectedCards.length}/${maxCards})`);
+                return false;
             }
         }
 
         // Обработка отправки выбранных карт через кнопку в приложении
-        submitButton.addEventListener('click', () => {
+        submitButton.addEventListener('click', async () => {
             log("Нажата кнопка 'Получить толкование'");
-            sendDataToBot();
+            await sendDataToBot();
         });
         
         // Обработка отправки выбранных карт через кнопку "Готово" в верхней части приложения
-        tgApp.MainButton.onClick(() => {
+        tgApp.MainButton.onClick(async () => {
             log("Нажата кнопка MainButton");
-            sendDataToBot();
+            await sendDataToBot();
+        });
+        
+        // Обработка закрытия приложения вручную
+        manualCloseButton.addEventListener('click', () => {
+            log("Нажата кнопка 'Закрыть приложение'");
+            tgApp.close();
         });
         
         // Добавляем обработчики событий для отладки
